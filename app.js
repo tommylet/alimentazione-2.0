@@ -1,10 +1,61 @@
 // =========================
 // CONFIG BASE
 // =========================
-const giorni = ["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato","Domenica"];
-const proteineList = ["Pollo","Tonno","Salmone"];
-const carboList = ["Riso Basmati","Pasta Integrale","Cous Cous","Patate"];
-const fruttaList = ["Mela Golden","Kiwi","Banana","Fragole"];
+const giorni = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
+const proteineList = ["Pollo", "Tonno", "Salmone"];
+const carboList = ["Riso Basmati", "Pasta Integrale", "Cous Cous", "Patate"];
+const fruttaList = ["Mela Golden", "Kiwi", "Banana", "Fragole"];
+
+const baseFoods = [
+  { name: "Petto di pollo", kcal: 165, carb: 0, prot: 31, fat: 3.6 },
+  { name: "Tonno al naturale", kcal: 116, carb: 0, prot: 26, fat: 1 },
+  { name: "Salmone", kcal: 208, carb: 0, prot: 20, fat: 13 },
+  { name: "Riso basmati", kcal: 130, carb: 28, prot: 2.7, fat: 0.3 },
+  { name: "Pasta integrale", kcal: 124, carb: 25, prot: 5, fat: 1 },
+  { name: "Patate", kcal: 77, carb: 17, prot: 2, fat: 0.1 },
+  { name: "Fiocchi d'avena", kcal: 389, carb: 66, prot: 17, fat: 7 },
+  { name: "Yogurt greco 0%", kcal: 59, carb: 3.6, prot: 10, fat: 0.4 },
+  { name: "Mandorle", kcal: 579, carb: 22, prot: 21, fat: 50 },
+  { name: "Olio EVO", kcal: 884, carb: 0, prot: 0, fat: 100 }
+];
+
+let foods = [...baseFoods];
+let planData = [];
+let macroChart = null;
+let kcalChart = null;
+
+const ui = {
+  sex: document.getElementById("sex"),
+  age: document.getElementById("age"),
+  weight: document.getElementById("weight"),
+  height: document.getElementById("height"),
+  activity: document.getElementById("activity"),
+  goal: document.getElementById("goal"),
+  tdee: document.getElementById("tdee"),
+  carb: document.getElementById("carb"),
+  prot: document.getElementById("prot"),
+  fat: document.getElementById("fat"),
+  autoCalc: document.getElementById("autoCalc"),
+  generatePlan: document.getElementById("generatePlan"),
+  resetPlan: document.getElementById("resetPlan"),
+  foodsList: document.getElementById("foodsList"),
+  foodSearch: document.getElementById("foodSearch"),
+  foodName: document.getElementById("foodName"),
+  foodKcal: document.getElementById("foodKcal"),
+  foodC: document.getElementById("foodC"),
+  foodP: document.getElementById("foodP"),
+  foodF: document.getElementById("foodF"),
+  addFood: document.getElementById("addFood"),
+  resetFoods: document.getElementById("resetFoods"),
+  chartDay: document.getElementById("chartDay"),
+  macroPie: document.getElementById("macroPie"),
+  kcalBar: document.getElementById("kcalBar"),
+  exportPDF: document.getElementById("exportPDF"),
+  exportJSON: document.getElementById("exportJSON"),
+  importFile: document.getElementById("importFile"),
+  importJSON: document.getElementById("importJSON"),
+  planContainer: document.getElementById("planContainer")
+};
 
 // =========================
 // TAB GIORNALIERE
@@ -52,69 +103,388 @@ function setupDayTabs(){
 // GENERA PIANO VARIABILE 5 PASTI
 // =========================
 function generatePlan(){
-  const tdee = Number(document.getElementById("tdee").value) || 2000;
-  const carbPerc = Number(document.getElementById("carb").value)/100;
-  const protPerc = Number(document.getElementById("prot").value)/100;
-  const fatPerc  = Number(document.getElementById("fat").value)/100;
+  const tdee = Number(ui.tdee.value) || 2000;
+  const carbPerc = Number(ui.carb.value) / 100;
+  const protPerc = Number(ui.prot.value) / 100;
+  const fatPerc = Number(ui.fat.value) / 100;
 
-  const totalCarbGr = tdee * carbPerc / 4;
-  const totalProtGr = tdee * protPerc / 4;
-  const totalFatGr  = tdee * fatPerc  / 9;
+  const totalCarbGr = Math.round((tdee * carbPerc) / 4);
+  const totalProtGr = Math.round((tdee * protPerc) / 4);
+  const totalFatGr = Math.round((tdee * fatPerc) / 9);
 
+  planData = [];
   let html = "";
-  for(let i=0;i<7;i++){
+  for (let i = 0; i < 7; i++) {
     const giorno = giorni[i];
     const p1 = proteineList[i % proteineList.length];
-    const p2 = proteineList[(i+1) % proteineList.length];
+    const p2 = proteineList[(i + 1) % proteineList.length];
     const c1 = carboList[i % carboList.length];
-    const c2 = carboList[(i+1) % carboList.length];
+    const c2 = carboList[(i + 1) % carboList.length];
     const f1 = fruttaList[i % fruttaList.length];
-    const f2 = fruttaList[(i+1) % fruttaList.length];
+    const f2 = fruttaList[(i + 1) % fruttaList.length];
+
+    const meals = [
+      {
+        title: "Colazione",
+        items: ["Fiocchi d'Avena 40g", "Yogurt Greco 150g", `${f1} 100g`]
+      },
+      {
+        title: "Spuntino Mattina",
+        items: ["Fiocchi di Latte 80g", "Mandorle 15g"]
+      },
+      {
+        title: "Pranzo",
+        items: [`${p1} 150g`, `${c1} 80g`, "Olio EVO 10g"]
+      },
+      {
+        title: "Spuntino Pomeriggio",
+        items: ["Yogurt Greco 150g", `${f2} 100g`]
+      },
+      {
+        title: "Cena",
+        items: [`${p2} 150g`, `${c2} 100g`, "Olio EVO 10g"]
+      }
+    ];
+
+    planData.push({
+      day: giorno,
+      macros: { carb: totalCarbGr, prot: totalProtGr, fat: totalFatGr },
+      meals
+    });
 
     html += `<div class="day-card" data-day="${i}"><h2>${giorno}</h2>`;
-
-    // Colazione
-    html += `<div class="pasto-card"><h3>Colazione</h3>
-      Fiocchi d'Avena 40g<br>
-      Yogurt Greco 150g<br>
-      ${f1} 100g
-    </div>`;
-
-    // Spuntino Mattina
-    html += `<div class="pasto-card"><h3>Spuntino Mattina</h3>
-      Fiocchi di Latte 80g<br>
-      Mandorle 15g
-    </div>`;
-
-    // Pranzo
-    html += `<div class="pasto-card"><h3>Pranzo</h3>
-      ${p1} 150g<br>
-      ${c1} 80g<br>
-      Olio EVO 10g
-    </div>`;
-
-    // Spuntino Pomeriggio
-    html += `<div class="pasto-card"><h3>Spuntino Pomeriggio</h3>
-      Yogurt Greco 150g<br>
-      ${f2} 100g
-    </div>`;
-
-    // Cena
-    html += `<div class="pasto-card"><h3>Cena</h3>
-      ${p2} 150g<br>
-      ${c2} 100g<br>
-      Olio EVO 10g
-    </div>`;
-
+    meals.forEach((meal) => {
+      html += `<div class="pasto-card"><h3>${meal.title}</h3>${meal.items.join("<br>")}</div>`;
+    });
     html += `</div>`;
   }
-  document.getElementById("planContainer").innerHTML = html;
+  ui.planContainer.innerHTML = html;
   setupDayTabs();
+  updateCharts();
+}
+
+// =========================
+// MACRO + TDEE
+// =========================
+function clampNumber(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function calculateTdee() {
+  const weight = Number(ui.weight.value);
+  const height = Number(ui.height.value);
+  const age = Number(ui.age.value);
+  const activity = Number(ui.activity.value);
+  const sex = ui.sex.value;
+
+  if (!weight || !height || !age) return;
+
+  const bmr =
+    sex === "M"
+      ? 10 * weight + 6.25 * height - 5 * age + 5
+      : 10 * weight + 6.25 * height - 5 * age - 161;
+
+  let tdee = bmr * activity;
+  if (ui.goal.value === "def") tdee *= 0.85;
+  if (ui.goal.value === "bulk") tdee *= 1.1;
+
+  ui.tdee.value = Math.round(tdee);
+}
+
+function ensureMacroTotals() {
+  const carb = Number(ui.carb.value) || 0;
+  const prot = Number(ui.prot.value) || 0;
+  const fat = Number(ui.fat.value) || 0;
+  const total = carb + prot + fat;
+
+  if (total === 100) return;
+  if (total === 0) {
+    ui.carb.value = 45;
+    ui.prot.value = 30;
+    ui.fat.value = 25;
+    return;
+  }
+
+  const factor = 100 / total;
+  ui.carb.value = Math.round(carb * factor);
+  ui.prot.value = Math.round(prot * factor);
+  ui.fat.value = clampNumber(100 - Number(ui.carb.value) - Number(ui.prot.value), 0, 100);
+}
+
+// =========================
+// FOODS
+// =========================
+function renderFoods(list) {
+  if (!ui.foodsList) return;
+
+  if (!list.length) {
+    ui.foodsList.innerHTML = "<p class='info-text'>Nessun alimento disponibile.</p>";
+    return;
+  }
+
+  ui.foodsList.innerHTML = `
+    <table class="foods-table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Kcal</th>
+          <th>Carbo</th>
+          <th>Prot</th>
+          <th>Grassi</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list
+          .map(
+            (food) => `
+          <tr>
+            <td>${food.name}</td>
+            <td>${food.kcal}</td>
+            <td>${food.carb}</td>
+            <td>${food.prot}</td>
+            <td>${food.fat}</td>
+          </tr>`
+          )
+          .join("")}
+      </tbody>
+    </table>`;
+}
+
+function addOrUpdateFood() {
+  const name = ui.foodName.value.trim();
+  if (!name) return;
+
+  const newFood = {
+    name,
+    kcal: Number(ui.foodKcal.value) || 0,
+    carb: Number(ui.foodC.value) || 0,
+    prot: Number(ui.foodP.value) || 0,
+    fat: Number(ui.foodF.value) || 0
+  };
+
+  const existingIndex = foods.findIndex((food) => food.name.toLowerCase() === name.toLowerCase());
+  if (existingIndex >= 0) {
+    foods[existingIndex] = newFood;
+  } else {
+    foods.push(newFood);
+  }
+
+  ui.foodName.value = "";
+  ui.foodKcal.value = "";
+  ui.foodC.value = "";
+  ui.foodP.value = "";
+  ui.foodF.value = "";
+  renderFoods(foods);
+}
+
+function filterFoods() {
+  const query = ui.foodSearch.value.trim().toLowerCase();
+  if (!query) {
+    renderFoods(foods);
+    return;
+  }
+  const filtered = foods.filter((food) => food.name.toLowerCase().includes(query));
+  renderFoods(filtered);
+}
+
+function resetFoods() {
+  foods = [...baseFoods];
+  renderFoods(foods);
+}
+
+// =========================
+// CHARTS
+// =========================
+function updateCharts() {
+  const tdee = Number(ui.tdee.value) || 0;
+  const carbPerc = Number(ui.carb.value) || 0;
+  const protPerc = Number(ui.prot.value) || 0;
+  const fatPerc = Number(ui.fat.value) || 0;
+
+  const macroData = [carbPerc, protPerc, fatPerc];
+  const kcalData = [
+    Math.round((tdee * carbPerc) / 100),
+    Math.round((tdee * protPerc) / 100),
+    Math.round((tdee * fatPerc) / 100)
+  ];
+
+  if (!macroChart) {
+    macroChart = new Chart(ui.macroPie, {
+      type: "doughnut",
+      data: {
+        labels: ["Carboidrati", "Proteine", "Grassi"],
+        datasets: [
+          {
+            data: macroData,
+            backgroundColor: ["#5AC8FA", "#34C759", "#FF9F0A"]
+          }
+        ]
+      },
+      options: { responsive: true }
+    });
+  } else {
+    macroChart.data.datasets[0].data = macroData;
+    macroChart.update();
+  }
+
+  if (!kcalChart) {
+    kcalChart = new Chart(ui.kcalBar, {
+      type: "bar",
+      data: {
+        labels: ["Carboidrati", "Proteine", "Grassi"],
+        datasets: [
+          {
+            label: "Kcal per macro",
+            data: kcalData,
+            backgroundColor: ["#5AC8FA", "#34C759", "#FF9F0A"]
+          }
+        ]
+      },
+      options: { responsive: true }
+    });
+  } else {
+    kcalChart.data.datasets[0].data = kcalData;
+    kcalChart.update();
+  }
+}
+
+function setupChartDayOptions() {
+  if (!ui.chartDay) return;
+  ui.chartDay.innerHTML = giorni.map((giorno, index) => `<option value="${index}">${giorno}</option>`).join("");
+}
+
+// =========================
+// EXPORT / IMPORT
+// =========================
+function exportData() {
+  const payload = {
+    user: {
+      sex: ui.sex.value,
+      age: ui.age.value,
+      weight: ui.weight.value,
+      height: ui.height.value,
+      activity: ui.activity.value,
+      goal: ui.goal.value,
+      tdee: ui.tdee.value,
+      carb: ui.carb.value,
+      prot: ui.prot.value,
+      fat: ui.fat.value
+    },
+    foods,
+    planData
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "piano-alimentare.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const data = JSON.parse(event.target.result);
+      if (data.user) {
+        ui.sex.value = data.user.sex ?? ui.sex.value;
+        ui.age.value = data.user.age ?? ui.age.value;
+        ui.weight.value = data.user.weight ?? ui.weight.value;
+        ui.height.value = data.user.height ?? ui.height.value;
+        ui.activity.value = data.user.activity ?? ui.activity.value;
+        ui.goal.value = data.user.goal ?? ui.goal.value;
+        ui.tdee.value = data.user.tdee ?? ui.tdee.value;
+        ui.carb.value = data.user.carb ?? ui.carb.value;
+        ui.prot.value = data.user.prot ?? ui.prot.value;
+        ui.fat.value = data.user.fat ?? ui.fat.value;
+      }
+      foods = Array.isArray(data.foods) ? data.foods : foods;
+      planData = Array.isArray(data.planData) ? data.planData : planData;
+      renderFoods(foods);
+      if (planData.length) {
+        ui.planContainer.innerHTML = planData
+          .map(
+            (day, index) => `
+            <div class="day-card" data-day="${index}">
+              <h2>${day.day}</h2>
+              ${day.meals
+                .map((meal) => `<div class="pasto-card"><h3>${meal.title}</h3>${meal.items.join("<br>")}</div>`)
+                .join("")}
+            </div>`
+          )
+          .join("");
+        setupDayTabs();
+      }
+      updateCharts();
+    } catch (error) {
+      console.error("Errore importazione JSON:", error);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function exportPdf() {
+  if (!window.jspdf?.jsPDF) return;
+  const doc = new window.jspdf.jsPDF();
+  doc.setFontSize(16);
+  doc.text("Piano Alimentare Settimanale", 14, 20);
+
+  doc.setFontSize(11);
+  doc.text(`TDEE: ${ui.tdee.value} kcal`, 14, 30);
+  doc.text(`Macro: C ${ui.carb.value}% / P ${ui.prot.value}% / F ${ui.fat.value}%`, 14, 36);
+
+  let y = 46;
+  planData.forEach((day) => {
+    doc.setFontSize(12);
+    doc.text(day.day, 14, y);
+    y += 6;
+    doc.setFontSize(10);
+    day.meals.forEach((meal) => {
+      doc.text(`${meal.title}: ${meal.items.join(", ")}`, 16, y);
+      y += 5;
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+    });
+    y += 4;
+  });
+
+  doc.save("piano-alimentare.pdf");
+}
+
+function resetPlan() {
+  planData = [];
+  ui.planContainer.innerHTML = "<p class='info-text'>Premi \"Genera Piano\" per visualizzare il piano.</p>";
 }
 
 // =========================
 // INIT
 // =========================
-window.addEventListener("DOMContentLoaded",()=>{
-  document.getElementById("generatePlan").onclick = generatePlan;
+window.addEventListener("DOMContentLoaded", () => {
+  setupChartDayOptions();
+  renderFoods(foods);
+  updateCharts();
+
+  ui.generatePlan.addEventListener("click", generatePlan);
+  ui.autoCalc.addEventListener("click", () => {
+    calculateTdee();
+    ensureMacroTotals();
+    updateCharts();
+  });
+  ui.resetPlan.addEventListener("click", resetPlan);
+  ui.addFood.addEventListener("click", addOrUpdateFood);
+  ui.resetFoods.addEventListener("click", resetFoods);
+  ui.foodSearch.addEventListener("input", filterFoods);
+  ui.exportJSON.addEventListener("click", exportData);
+  ui.importJSON.addEventListener("click", () => ui.importFile.click());
+  ui.importFile.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) importData(file);
+  });
+  ui.exportPDF.addEventListener("click", exportPdf);
 });

@@ -134,6 +134,28 @@ button {
     color: #666;
 }
 
+.foods-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+
+.foods-table th,
+.foods-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #eef1f6;
+    font-size: 14px;
+}
+
+.foods-table th {
+    background: #f1f5ff;
+    color: #0b2545;
+}
+
 /* ======================
    TAB GIORNALIERE MIGLIORATE
    ====================== */
