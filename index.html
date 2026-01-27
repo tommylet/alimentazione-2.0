@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Piano Alimentare Settimanale</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- jsPDF for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <header class="header">
+        <h1>Piano Alimentare Settimanale</h1>
+    </header>
+
+<section class="controls-section">
+  <h2 class="section-title">Dati utente</h2>
+  <div class="controls grid-2">
+    <label>Sesso<select id="sex"><option value="M">Maschio</option><option value="F">Femmina</option></select></label>
+    <label>Età (anni)<input type="number" id="age" value="30" min="12" max="90"></label>
+    <label>Peso (kg)<input type="number" id="weight" value="75" step="0.1" min="30" max="250"></label>
+    <label>Altezza (cm)<input type="number" id="height" value="175" step="0.5" min="120" max="230"></label>
+    <label>Attività<select id="activity">
+      <option value="1.2">Sedentario (x1.2)</option>
+      <option value="1.375">Leggera 1-3/sett (x1.375)</option>
+      <option value="1.55" selected>Moderata 3-5/sett (x1.55)</option>
+      <option value="1.725">Intensa 6-7/sett (x1.725)</option>
+      <option value="1.9">Molto intensa (x1.9)</option>
+    </select></label>
+    <label>Obiettivo<select id="goal">
+      <option value="def">Definizione</option>
+      <option value="main" selected>Mantenimento</option>
+      <option value="bulk">Massa</option>
+    </select></label>
+  </div>
+  <div class="controls grid-3">
+    <label>TDEE (kcal)<input type="number" id="tdee" value="1900"></label>
+    <label>Carboidrati (%)<input type="number" id="carb" value="45"></label>
+    <label>Proteine (%)<input type="number" id="prot" value="30"></label>
+    <label>Grassi (%)<input type="number" id="fat" value="25"></label>
+    <div class="buttons-row">
+      <button id="autoCalc">Calcola TDEE & Macro</button>
+      <button id="generatePlan">Genera Piano</button>
+      <button id="resetPlan" class="secondary">Reset Piano</button>
+    </div>
+  </div>
+</section>
+
+<section class="foods-section">
+  <h2 class="section-title">Gestione alimenti</h2>
+  <div class="controls grid-2"><label>Cerca alimento<input type="text" id="foodSearch" placeholder="Cerca per nome..."></label></div>
+  <div class="controls grid-4">
+    <label>Nome alimento<input type="text" id="foodName" placeholder="Es. Salmone"></label>
+    <label>Kcal /100g<input type="number" id="foodKcal" step="1" min="0"></label>
+    <label>Carbo /100g<input type="number" id="foodC" step="0.1" min="0"></label>
+    <label>Prot /100g<input type="number" id="foodP" step="0.1" min="0"></label>
+    <label>Grassi /100g<input type="number" id="foodF" step="0.1" min="0"></label>
+    <div class="buttons-row">
+      <button id="addFood">Aggiungi/aggiorna alimento</button>
+      <button id="resetFoods" class="secondary">Reset elenco base</button>
+    </div>
+  </div>
+  <div id="foodsList" class="foods-list"></div>
+</section>
+
+<section class="charts-section">
+  <h2 class="section-title">Grafici riepilogativi</h2>
+  <div class="chart-controls"><label>Giorno<select id="chartDay"></select></label></div>
+  <div class="charts"><canvas id="macroPie"></canvas><canvas id="kcalBar"></canvas></div>
+</section>
+
+<section class="plan-section">
+    <h2 class="section-title">Piano settimanale</h2>
+    <div id="dayTabs" class="day-tabs"></div>
+    <div id="planContainer" class="plan-container"><p class="info-text">Premi "Genera Piano" per visualizzare il piano.</p></div>
+    <div class="buttons-row" style="margin-top:8px">
+        <button id="exportPDF">📄 Esporta in PDF</button>
+        <button id="exportJSON">💾 Esporta dati (JSON)</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+        <button id="importJSON" class="secondary">📥 Importa dati (JSON)</button>
+    </div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>
