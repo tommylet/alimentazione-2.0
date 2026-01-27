@@ -78,6 +78,7 @@ const baseFoods = [
 ];
 
 let foods = [...baseFoods];
+let selectedFoods = new Set(baseFoods.map((food) => food.name));
 let planData = [];
 let kcalChart = null;
 
@@ -92,11 +93,14 @@ const ui = {
   carb: document.getElementById("carb"),
   prot: document.getElementById("prot"),
   fat: document.getElementById("fat"),
+  mealCount: document.getElementById("mealCount"),
   autoCalc: document.getElementById("autoCalc"),
   generatePlan: document.getElementById("generatePlan"),
   resetPlan: document.getElementById("resetPlan"),
   foodsList: document.getElementById("foodsList"),
   foodSearch: document.getElementById("foodSearch"),
+  selectAllFoods: document.getElementById("selectAllFoods"),
+  deselectAllFoods: document.getElementById("deselectAllFoods"),
   foodName: document.getElementById("foodName"),
   foodKcal: document.getElementById("foodKcal"),
   foodC: document.getElementById("foodC"),
@@ -164,44 +168,39 @@ function generatePlan(){
   const carbPerc = Number(ui.carb.value) / 100;
   const protPerc = Number(ui.prot.value) / 100;
   const fatPerc = Number(ui.fat.value) / 100;
+  const mealCount = Number(ui.mealCount?.value) || 5;
 
   const totalCarbGr = Math.round((tdee * carbPerc) / 4);
   const totalProtGr = Math.round((tdee * protPerc) / 4);
   const totalFatGr = Math.round((tdee * fatPerc) / 9);
 
+  const selectedNames = foods
+    .map((food) => food.name)
+    .filter((name) => selectedFoods.has(name));
+  const planFoods = selectedNames.length ? selectedNames : foods.map((food) => food.name);
+  const itemsPerMeal = 2;
+
+  const mealLabels = {
+    3: ["Colazione", "Pranzo", "Cena"],
+    4: ["Colazione", "Spuntino", "Pranzo", "Cena"],
+    5: ["Colazione", "Spuntino Mattina", "Pranzo", "Spuntino Pomeriggio", "Cena"],
+    6: ["Colazione", "Spuntino Mattina", "Pranzo", "Spuntino Pomeriggio", "Cena", "Pre-nanna"]
+  };
+
   planData = [];
   let html = "";
   for (let i = 0; i < 7; i++) {
     const giorno = giorni[i];
-    const p1 = proteineList[i % proteineList.length];
-    const p2 = proteineList[(i + 1) % proteineList.length];
-    const c1 = carboList[i % carboList.length];
-    const c2 = carboList[(i + 1) % carboList.length];
-    const f1 = fruttaList[i % fruttaList.length];
-    const f2 = fruttaList[(i + 1) % fruttaList.length];
+    const labels = mealLabels[mealCount] ?? mealLabels[5];
 
-    const meals = [
-      {
-        title: "Colazione",
-        items: ["Fiocchi d'Avena 40g", "Yogurt Greco 150g", `${f1} 100g`]
-      },
-      {
-        title: "Spuntino Mattina",
-        items: ["Fiocchi di Latte 80g", "Mandorle 15g"]
-      },
-      {
-        title: "Pranzo",
-        items: [`${p1} 150g`, `${c1} 80g`, "Olio EVO 10g"]
-      },
-      {
-        title: "Spuntino Pomeriggio",
-        items: ["Yogurt Greco 150g", `${f2} 100g`]
-      },
-      {
-        title: "Cena",
-        items: [`${p2} 150g`, `${c2} 100g`, "Olio EVO 10g"]
-      }
-    ];
+    const meals = labels.map((label, mealIndex) => {
+      const baseIndex = (i * labels.length + mealIndex) * itemsPerMeal;
+      const items = Array.from({ length: itemsPerMeal }, (_, itemIndex) => {
+        const foodName = planFoods[(baseIndex + itemIndex) % planFoods.length];
+        return `${foodName} 100g`;
+      });
+      return { title: label, items };
+    });
 
     planData.push({
       day: giorno,
@@ -288,6 +287,7 @@ function renderFoods(list) {
           <th>Carbo</th>
           <th>Prot</th>
           <th>Grassi</th>
+          <th>Usa nel piano</th>
         </tr>
       </thead>
       <tbody>
@@ -300,11 +300,28 @@ function renderFoods(list) {
             <td>${food.carb}</td>
             <td>${food.prot}</td>
             <td>${food.fat}</td>
+            <td>
+              <input class="food-select" type="checkbox" data-name="${food.name}" ${
+                selectedFoods.has(food.name) ? "checked" : ""
+              }>
+            </td>
           </tr>`
           )
           .join("")}
       </tbody>
     </table>`;
+
+  ui.foodsList.querySelectorAll(".food-select").forEach((checkbox) => {
+    checkbox.addEventListener("change", (event) => {
+      const name = event.target.dataset.name;
+      if (!name) return;
+      if (event.target.checked) {
+        selectedFoods.add(name);
+      } else {
+        selectedFoods.delete(name);
+      }
+    });
+  });
 }
 
 function addOrUpdateFood() {
@@ -325,6 +342,7 @@ function addOrUpdateFood() {
   } else {
     foods.push(newFood);
   }
+  selectedFoods.add(newFood.name);
 
   ui.foodName.value = "";
   ui.foodKcal.value = "";
@@ -346,6 +364,17 @@ function filterFoods() {
 
 function resetFoods() {
   foods = [...baseFoods];
+  selectedFoods = new Set(foods.map((food) => food.name));
+  renderFoods(foods);
+}
+
+function selectAllFoods() {
+  selectedFoods = new Set(foods.map((food) => food.name));
+  renderFoods(foods);
+}
+
+function deselectAllFoods() {
+  selectedFoods = new Set();
   renderFoods(foods);
 }
 
@@ -536,6 +565,8 @@ window.addEventListener("DOMContentLoaded", () => {
   ui.resetPlan.addEventListener("click", resetPlan);
   ui.addFood.addEventListener("click", addOrUpdateFood);
   ui.resetFoods.addEventListener("click", resetFoods);
+  ui.selectAllFoods.addEventListener("click", selectAllFoods);
+  ui.deselectAllFoods.addEventListener("click", deselectAllFoods);
   ui.foodSearch.addEventListener("input", filterFoods);
   ui.exportJSON.addEventListener("click", exportData);
   ui.importJSON.addEventListener("click", () => ui.importFile.click());

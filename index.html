@@ -39,6 +39,14 @@
     <label>Carboidrati (%)<input type="number" id="carb" value="45"></label>
     <label>Proteine (%)<input type="number" id="prot" value="30"></label>
     <label>Grassi (%)<input type="number" id="fat" value="25"></label>
+    <label>Pasti giornalieri
+      <select id="mealCount">
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5" selected>5</option>
+        <option value="6">6</option>
+      </select>
+    </label>
     <p id="macroSummary" class="info-text"></p>
     <div class="buttons-row">
       <button id="autoCalc">Calcola TDEE & Macro</button>
@@ -50,7 +58,13 @@
 
 <section class="foods-section">
   <h2 class="section-title">Gestione alimenti</h2>
-  <div class="controls grid-2"><label>Cerca alimento<input type="text" id="foodSearch" placeholder="Cerca per nome..."></label></div>
+  <div class="controls grid-2">
+    <label>Cerca alimento<input type="text" id="foodSearch" placeholder="Cerca per nome..."></label>
+    <div class="buttons-row">
+      <button id="selectAllFoods" class="secondary">Seleziona tutti</button>
+      <button id="deselectAllFoods" class="secondary">Deseleziona tutti</button>
+    </div>
+  </div>
   <div class="controls grid-4">
     <label>Nome alimento<input type="text" id="foodName" placeholder="Es. Salmone"></label>
     <label>Kcal /100g<input type="number" id="foodKcal" step="1" min="0"></label>
