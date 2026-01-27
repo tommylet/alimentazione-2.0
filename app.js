@@ -161,6 +161,54 @@ function setupDayTabs(){
 }
 
 // =========================
+// UTILITIES
+// =========================
+function getFoodByName(name) {
+  return foods.find((food) => food.name.toLowerCase() === name.toLowerCase());
+}
+
+function calculateItemKcal(item) {
+  const food = getFoodByName(item.name);
+  if (!food) return 0;
+  return Math.round((food.kcal * item.grams) / 100);
+}
+
+function parseFoodItem(raw) {
+  if (typeof raw !== "string") return raw;
+  const match = raw.match(/(.+?)\s(\d+(?:[.,]\d+)?)g$/i);
+  if (!match) {
+    return { name: raw.trim(), grams: 100 };
+  }
+  return { name: match[1].trim(), grams: Number(match[2].replace(",", ".")) };
+}
+
+function getPreferredFood(preferredList, fallbackIndex, pool) {
+  const normalizedPool = pool.map((name) => name.toLowerCase());
+  const found = preferredList.find((name) => normalizedPool.includes(name.toLowerCase()));
+  if (found) return found;
+  return pool[fallbackIndex % pool.length];
+}
+
+function buildBreakfastOptions(planFoods, dayIndex) {
+  const sweetChoices = ["Fiocchi d'avena", "Yogurt greco 0%", "Banana", "Fragole", "Mela Golden"];
+  const savoryChoices = ["Uova", "Pane integrale", "Avocado", "Fiocchi di latte", "Petto di pollo"];
+
+  const sweet = [
+    getPreferredFood(sweetChoices, dayIndex, planFoods),
+    getPreferredFood(sweetChoices, dayIndex + 1, planFoods)
+  ];
+  const savory = [
+    getPreferredFood(savoryChoices, dayIndex, planFoods),
+    getPreferredFood(savoryChoices, dayIndex + 2, planFoods)
+  ];
+
+  return {
+    sweet: sweet.map((name) => ({ name, grams: 100 })),
+    savory: savory.map((name) => ({ name, grams: 100 }))
+  };
+}
+
+// =========================
 // GENERA PIANO VARIABILE 5 PASTI
 // =========================
 function generatePlan(){
@@ -178,6 +226,10 @@ function generatePlan(){
     .map((food) => food.name)
     .filter((name) => selectedFoods.has(name));
   const planFoods = selectedNames.length ? selectedNames : foods.map((food) => food.name);
+  if (!planFoods.length) {
+    ui.planContainer.innerHTML = "<p class='info-text'>Seleziona almeno un alimento per generare il piano.</p>";
+    return;
+  }
   const itemsPerMeal = 2;
 
   const mealLabels = {
@@ -188,16 +240,23 @@ function generatePlan(){
   };
 
   planData = [];
-  let html = "";
   for (let i = 0; i < 7; i++) {
     const giorno = giorni[i];
     const labels = mealLabels[mealCount] ?? mealLabels[5];
 
     const meals = labels.map((label, mealIndex) => {
+      if (label === "Colazione") {
+        return {
+          title: label,
+          type: "breakfast",
+          choice: "sweet",
+          options: buildBreakfastOptions(planFoods, i)
+        };
+      }
       const baseIndex = (i * labels.length + mealIndex) * itemsPerMeal;
       const items = Array.from({ length: itemsPerMeal }, (_, itemIndex) => {
         const foodName = planFoods[(baseIndex + itemIndex) % planFoods.length];
-        return `${foodName} 100g`;
+        return { name: foodName, grams: 100 };
       });
       return { title: label, items };
     });
@@ -207,14 +266,8 @@ function generatePlan(){
       macros: { carb: totalCarbGr, prot: totalProtGr, fat: totalFatGr },
       meals
     });
-
-    html += `<div class="day-card" data-day="${i}"><h2>${giorno}</h2>`;
-    meals.forEach((meal) => {
-      html += `<div class="pasto-card"><h3>${meal.title}</h3>${meal.items.join("<br>")}</div>`;
-    });
-    html += `</div>`;
   }
-  ui.planContainer.innerHTML = html;
+  renderPlan();
   setupDayTabs();
   updateCharts();
 }
@@ -324,6 +377,181 @@ function renderFoods(list) {
   });
 }
 
+function renderPlan() {
+  let html = "";
+  planData.forEach((day, dayIndex) => {
+    html += `<div class="day-card" data-day="${dayIndex}">
+      <h2>${day.day}</h2>
+      <p class="day-total" data-day-total="${dayIndex}"></p>`;
+
+    day.meals.forEach((meal, mealIndex) => {
+      if (meal.type === "breakfast") {
+        html += `
+          <div class="pasto-card" data-day="${dayIndex}" data-meal="${mealIndex}">
+            <h3>${meal.title}</h3>
+            <div class="meal-choice">
+              <label><input type="radio" name="breakfast-${dayIndex}" value="sweet" ${
+                meal.choice === "sweet" ? "checked" : ""
+              }> Dolce</label>
+              <label><input type="radio" name="breakfast-${dayIndex}" value="savory" ${
+                meal.choice === "savory" ? "checked" : ""
+              }> Salata</label>
+            </div>
+            ${["sweet", "savory"]
+              .map((option) => {
+                const isActive = meal.choice === option;
+                const items = meal.options[option] ?? [];
+                return `
+                  <div class="meal-option ${isActive ? "active" : ""}" data-option="${option}">
+                    ${items
+                      .map(
+                        (item, itemIndex) => `
+                      <div class="meal-item">
+                        <select class="food-item-select" data-day="${dayIndex}" data-meal="${mealIndex}" data-item="${itemIndex}" data-option="${option}">
+                          ${foods
+                            .map(
+                              (food) =>
+                                `<option value="${food.name}" ${
+                                  food.name === item.name ? "selected" : ""
+                                }>${food.name}</option>`
+                            )
+                            .join("")}
+                        </select>
+                        <input class="food-item-grams" type="number" min="0" step="1" value="${item.grams}" data-day="${dayIndex}" data-meal="${mealIndex}" data-item="${itemIndex}" data-option="${option}">
+                        <span>g</span>
+                      </div>`
+                      )
+                      .join("")}
+                  </div>`;
+              })
+              .join("")}
+            <p class="meal-total" data-meal-total="${dayIndex}-${mealIndex}"></p>
+          </div>`;
+        return;
+      }
+
+      html += `
+        <div class="pasto-card" data-day="${dayIndex}" data-meal="${mealIndex}">
+          <h3>${meal.title}</h3>
+          ${meal.items
+            .map(
+              (item, itemIndex) => `
+            <div class="meal-item">
+              <select class="food-item-select" data-day="${dayIndex}" data-meal="${mealIndex}" data-item="${itemIndex}">
+                ${foods
+                  .map(
+                    (food) =>
+                      `<option value="${food.name}" ${food.name === item.name ? "selected" : ""}>${
+                        food.name
+                      }</option>`
+                  )
+                  .join("")}
+              </select>
+              <input class="food-item-grams" type="number" min="0" step="1" value="${item.grams}" data-day="${dayIndex}" data-meal="${mealIndex}" data-item="${itemIndex}">
+              <span>g</span>
+            </div>`
+            )
+            .join("")}
+          <p class="meal-total" data-meal-total="${dayIndex}-${mealIndex}"></p>
+        </div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  ui.planContainer.innerHTML = html || "<p class='info-text'>Premi \"Genera Piano\" per visualizzare il piano.</p>";
+  bindPlanControls();
+  updatePlanTotals();
+  if (planData.length) {
+    setupDayTabs();
+  }
+}
+
+function bindPlanControls() {
+  ui.planContainer.querySelectorAll(".food-item-select").forEach((select) => {
+    select.addEventListener("change", (event) => {
+      const { day, meal, item, option } = event.target.dataset;
+      const dayIndex = Number(day);
+      const mealIndex = Number(meal);
+      const itemIndex = Number(item);
+      const mealData = planData[dayIndex]?.meals[mealIndex];
+      if (!mealData) return;
+
+      if (mealData.type === "breakfast" && option) {
+        mealData.options[option][itemIndex].name = event.target.value;
+      } else {
+        mealData.items[itemIndex].name = event.target.value;
+      }
+      updatePlanTotals();
+    });
+  });
+
+  ui.planContainer.querySelectorAll(".food-item-grams").forEach((input) => {
+    input.addEventListener("input", (event) => {
+      const { day, meal, item, option } = event.target.dataset;
+      const dayIndex = Number(day);
+      const mealIndex = Number(meal);
+      const itemIndex = Number(item);
+      const mealData = planData[dayIndex]?.meals[mealIndex];
+      if (!mealData) return;
+
+      const gramsValue = Number(event.target.value) || 0;
+      if (mealData.type === "breakfast" && option) {
+        mealData.options[option][itemIndex].grams = gramsValue;
+      } else {
+        mealData.items[itemIndex].grams = gramsValue;
+      }
+      updatePlanTotals();
+    });
+  });
+
+  ui.planContainer.querySelectorAll("input[type='radio'][name^='breakfast-']").forEach((radio) => {
+    radio.addEventListener("change", (event) => {
+      const dayIndex = Number(event.target.name.replace("breakfast-", ""));
+      const choice = event.target.value;
+      const mealData = planData[dayIndex]?.meals.find((meal) => meal.type === "breakfast");
+      if (!mealData) return;
+
+      mealData.choice = choice;
+      const breakfastCard = ui.planContainer.querySelector(
+        `.pasto-card[data-day="${dayIndex}"][data-meal="${planData[dayIndex].meals.indexOf(mealData)}"]`
+      );
+      if (breakfastCard) {
+        breakfastCard.querySelectorAll(".meal-option").forEach((option) => {
+          option.classList.toggle("active", option.dataset.option === choice);
+        });
+      }
+      updatePlanTotals();
+    });
+  });
+}
+
+function getMealItems(meal) {
+  if (meal.type === "breakfast") {
+    return meal.options?.[meal.choice] ?? [];
+  }
+  return meal.items ?? [];
+}
+
+function updatePlanTotals() {
+  planData.forEach((day, dayIndex) => {
+    let dayTotal = 0;
+    day.meals.forEach((meal, mealIndex) => {
+      const items = getMealItems(meal);
+      const mealTotal = items.reduce((sum, item) => sum + calculateItemKcal(item), 0);
+      dayTotal += mealTotal;
+      const mealTotalNode = ui.planContainer.querySelector(`[data-meal-total="${dayIndex}-${mealIndex}"]`);
+      if (mealTotalNode) {
+        mealTotalNode.textContent = `Kcal pasto: ${mealTotal}`;
+      }
+    });
+    const dayTotalNode = ui.planContainer.querySelector(`[data-day-total="${dayIndex}"]`);
+    if (dayTotalNode) {
+      dayTotalNode.textContent = `Totale giorno: ${dayTotal} kcal`;
+    }
+  });
+}
+
 function addOrUpdateFood() {
   const name = ui.foodName.value.trim();
   if (!name) return;
@@ -350,6 +578,9 @@ function addOrUpdateFood() {
   ui.foodP.value = "";
   ui.foodF.value = "";
   renderFoods(foods);
+  if (planData.length) {
+    renderPlan();
+  }
 }
 
 function filterFoods() {
@@ -366,6 +597,9 @@ function resetFoods() {
   foods = [...baseFoods];
   selectedFoods = new Set(foods.map((food) => food.name));
   renderFoods(foods);
+  if (planData.length) {
+    renderPlan();
+  }
 }
 
 function selectAllFoods() {
@@ -437,6 +671,7 @@ function exportData() {
       fat: ui.fat.value
     },
     foods,
+    selectedFoods: Array.from(selectedFoods),
     planData
   };
 
@@ -469,21 +704,29 @@ function importData(file) {
         ui.fat.value = data.user.fat ?? ui.fat.value;
       }
       foods = Array.isArray(data.foods) ? data.foods : foods;
+      selectedFoods = new Set(Array.isArray(data.selectedFoods) ? data.selectedFoods : foods.map((food) => food.name));
       planData = Array.isArray(data.planData) ? data.planData : planData;
+      planData = planData.map((day) => ({
+        ...day,
+        meals: (day.meals ?? []).map((meal) => {
+          if (meal.type === "breakfast") {
+            return {
+              ...meal,
+              options: {
+                sweet: (meal.options?.sweet ?? []).map(parseFoodItem),
+                savory: (meal.options?.savory ?? []).map(parseFoodItem)
+              }
+            };
+          }
+          return {
+            ...meal,
+            items: (meal.items ?? []).map(parseFoodItem)
+          };
+        })
+      }));
       renderFoods(foods);
       if (planData.length) {
-        ui.planContainer.innerHTML = planData
-          .map(
-            (day, index) => `
-            <div class="day-card" data-day="${index}">
-              <h2>${day.day}</h2>
-              ${day.meals
-                .map((meal) => `<div class="pasto-card"><h3>${meal.title}</h3>${meal.items.join("<br>")}</div>`)
-                .join("")}
-            </div>`
-          )
-          .join("");
-        setupDayTabs();
+        renderPlan();
       }
       updateCharts();
     } catch (error) {
@@ -510,7 +753,10 @@ function exportPdf() {
     y += 6;
     doc.setFontSize(10);
     day.meals.forEach((meal) => {
-      doc.text(`${meal.title}: ${meal.items.join(", ")}`, 16, y);
+      const items = getMealItems(meal);
+      const line = items.map((item) => `${item.name} ${item.grams}g`).join(", ");
+      const title = meal.type === "breakfast" ? `${meal.title} (${meal.choice === "sweet" ? "Dolce" : "Salata"})` : meal.title;
+      doc.text(`${title}: ${line}`, 16, y);
       y += 5;
       if (y > 270) {
         doc.addPage();
