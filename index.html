@@ -39,6 +39,7 @@
     <label>Carboidrati (%)<input type="number" id="carb" value="45"></label>
     <label>Proteine (%)<input type="number" id="prot" value="30"></label>
     <label>Grassi (%)<input type="number" id="fat" value="25"></label>
+    <p id="macroSummary" class="info-text"></p>
     <div class="buttons-row">
       <button id="autoCalc">Calcola TDEE & Macro</button>
       <button id="generatePlan">Genera Piano</button>
@@ -67,7 +68,7 @@
 <section class="charts-section">
   <h2 class="section-title">Grafici riepilogativi</h2>
   <div class="chart-controls"><label>Giorno<select id="chartDay"></select></label></div>
-  <div class="charts"><canvas id="macroPie"></canvas><canvas id="kcalBar"></canvas></div>
+  <div class="charts"><canvas id="kcalBar"></canvas></div>
 </section>
 
 <section class="plan-section">

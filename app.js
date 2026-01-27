@@ -8,20 +8,28 @@ const fruttaList = ["Mela Golden", "Kiwi", "Banana", "Fragole"];
 
 const baseFoods = [
   { name: "Petto di pollo", kcal: 165, carb: 0, prot: 31, fat: 3.6 },
+  { name: "Tacchino", kcal: 135, carb: 0, prot: 30, fat: 1 },
   { name: "Tonno al naturale", kcal: 116, carb: 0, prot: 26, fat: 1 },
   { name: "Salmone", kcal: 208, carb: 0, prot: 20, fat: 13 },
+  { name: "Uova", kcal: 143, carb: 1.1, prot: 13, fat: 9.5 },
+  { name: "Fiocchi di latte", kcal: 98, carb: 3.4, prot: 11, fat: 4 },
+  { name: "Yogurt greco 0%", kcal: 59, carb: 3.6, prot: 10, fat: 0.4 },
+  { name: "Fiocchi d'avena", kcal: 389, carb: 66, prot: 17, fat: 7 },
   { name: "Riso basmati", kcal: 130, carb: 28, prot: 2.7, fat: 0.3 },
   { name: "Pasta integrale", kcal: 124, carb: 25, prot: 5, fat: 1 },
+  { name: "Cous cous", kcal: 112, carb: 23, prot: 3.8, fat: 0.2 },
   { name: "Patate", kcal: 77, carb: 17, prot: 2, fat: 0.1 },
-  { name: "Fiocchi d'avena", kcal: 389, carb: 66, prot: 17, fat: 7 },
-  { name: "Yogurt greco 0%", kcal: 59, carb: 3.6, prot: 10, fat: 0.4 },
+  { name: "Pane integrale", kcal: 247, carb: 41, prot: 13, fat: 4.2 },
+  { name: "Mela Golden", kcal: 52, carb: 14, prot: 0.3, fat: 0.2 },
+  { name: "Kiwi", kcal: 61, carb: 15, prot: 1.1, fat: 0.5 },
+  { name: "Banana", kcal: 89, carb: 23, prot: 1.1, fat: 0.3 },
+  { name: "Fragole", kcal: 32, carb: 7.7, prot: 0.7, fat: 0.3 },
   { name: "Mandorle", kcal: 579, carb: 22, prot: 21, fat: 50 },
   { name: "Olio EVO", kcal: 884, carb: 0, prot: 0, fat: 100 }
 ];
 
 let foods = [...baseFoods];
 let planData = [];
-let macroChart = null;
 let kcalChart = null;
 
 const ui = {
@@ -48,8 +56,8 @@ const ui = {
   addFood: document.getElementById("addFood"),
   resetFoods: document.getElementById("resetFoods"),
   chartDay: document.getElementById("chartDay"),
-  macroPie: document.getElementById("macroPie"),
   kcalBar: document.getElementById("kcalBar"),
+  macroSummary: document.getElementById("macroSummary"),
   exportPDF: document.getElementById("exportPDF"),
   exportJSON: document.getElementById("exportJSON"),
   importFile: document.getElementById("importFile"),
@@ -301,31 +309,11 @@ function updateCharts() {
   const protPerc = Number(ui.prot.value) || 0;
   const fatPerc = Number(ui.fat.value) || 0;
 
-  const macroData = [carbPerc, protPerc, fatPerc];
   const kcalData = [
     Math.round((tdee * carbPerc) / 100),
     Math.round((tdee * protPerc) / 100),
     Math.round((tdee * fatPerc) / 100)
   ];
-
-  if (!macroChart) {
-    macroChart = new Chart(ui.macroPie, {
-      type: "doughnut",
-      data: {
-        labels: ["Carboidrati", "Proteine", "Grassi"],
-        datasets: [
-          {
-            data: macroData,
-            backgroundColor: ["#5AC8FA", "#34C759", "#FF9F0A"]
-          }
-        ]
-      },
-      options: { responsive: true }
-    });
-  } else {
-    macroChart.data.datasets[0].data = macroData;
-    macroChart.update();
-  }
 
   if (!kcalChart) {
     kcalChart = new Chart(ui.kcalBar, {
@@ -462,6 +450,25 @@ function resetPlan() {
   ui.planContainer.innerHTML = "<p class='info-text'>Premi \"Genera Piano\" per visualizzare il piano.</p>";
 }
 
+function updateMacroSummary() {
+  if (!ui.macroSummary) return;
+  const tdee = Number(ui.tdee.value) || 0;
+  const carbPerc = Number(ui.carb.value) || 0;
+  const protPerc = Number(ui.prot.value) || 0;
+  const fatPerc = Number(ui.fat.value) || 0;
+
+  if (!tdee) {
+    ui.macroSummary.textContent = "Inserisci i dati e calcola il TDEE per vedere i macro.";
+    return;
+  }
+
+  const carbGr = Math.round((tdee * carbPerc) / 100 / 4);
+  const protGr = Math.round((tdee * protPerc) / 100 / 4);
+  const fatGr = Math.round((tdee * fatPerc) / 100 / 9);
+
+  ui.macroSummary.textContent = `Macro: C ${carbPerc}% (${carbGr}g) · P ${protPerc}% (${protGr}g) · F ${fatPerc}% (${fatGr}g)`;
+}
+
 // =========================
 // INIT
 // =========================
@@ -475,6 +482,7 @@ window.addEventListener("DOMContentLoaded", () => {
     calculateTdee();
     ensureMacroTotals();
     updateCharts();
+    updateMacroSummary();
   });
   ui.resetPlan.addEventListener("click", resetPlan);
   ui.addFood.addEventListener("click", addOrUpdateFood);
@@ -487,4 +495,12 @@ window.addEventListener("DOMContentLoaded", () => {
     if (file) importData(file);
   });
   ui.exportPDF.addEventListener("click", exportPdf);
+  [ui.tdee, ui.carb, ui.prot, ui.fat].forEach((input) => {
+    input.addEventListener("input", () => {
+      ensureMacroTotals();
+      updateCharts();
+      updateMacroSummary();
+    });
+  });
+  updateMacroSummary();
 });
