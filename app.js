@@ -189,7 +189,7 @@ function getPreferredFood(preferredList, fallbackIndex, pool) {
   return pool[fallbackIndex % pool.length];
 }
 
-function buildBreakfastOptions(planFoods, pools, dayIndex) {
+function buildBreakfastOptions(planFoods, pools, dayIndex, targetKcal, macroPercents) {
   const sweetChoices = ["Fiocchi d'avena", "Yogurt greco 0%", "Banana", "Fragole", "Mela Golden"];
   const savoryChoices = ["Uova", "Pane integrale", "Avocado", "Fiocchi di latte", "Petto di pollo"];
 
@@ -197,8 +197,8 @@ function buildBreakfastOptions(planFoods, pools, dayIndex) {
   const savorySeed = getPreferredFood(savoryChoices, dayIndex, planFoods);
 
   return {
-    sweet: buildMealItems(pools, dayIndex, 0, true, sweetSeed),
-    savory: buildMealItems(pools, dayIndex, 1, true, savorySeed)
+    sweet: buildMealItems(pools, dayIndex, 0, true, sweetSeed, targetKcal, macroPercents),
+    savory: buildMealItems(pools, dayIndex, 1, true, savorySeed, targetKcal, macroPercents)
   };
 }
 
@@ -285,7 +285,20 @@ function pickFromPool(pool, index, used, fallbackPool) {
   return list[index % list.length];
 }
 
-function buildMealItems(pools, dayIndex, mealIndex, preferFruit, seedName) {
+function roundGrams(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.round(value / 5) * 5);
+}
+
+function calculateGramsForFood(food, targetKcal, minGrams = 30) {
+  if (!food || food.kcal <= 0) return 0;
+  const grams = (targetKcal / food.kcal) * 100;
+  const rounded = roundGrams(grams);
+  if (rounded === 0 && targetKcal > 0) return minGrams;
+  return Math.max(rounded, minGrams);
+}
+
+function buildMealItems(pools, dayIndex, mealIndex, preferFruit, seedName, targetKcal, macroPercents) {
   const used = new Set();
   const items = [];
   const baseIndex = dayIndex * 3 + mealIndex;
@@ -303,16 +316,48 @@ function buildMealItems(pools, dayIndex, mealIndex, preferFruit, seedName) {
   const produceFallback = producePool.length ? producePool : pools.produce;
   const produce = pickFromPool(producePool, baseIndex + 3, used, produceFallback);
 
-  [carb, protein, fat, produce].forEach((food) => {
-    if (food && items.length < 4) {
-      items.push({ name: food.name, grams: 100 });
-    }
-  });
+  if (carb) items.push({ name: carb.name, grams: 100, role: "carb" });
+  if (protein) items.push({ name: protein.name, grams: 100, role: "protein" });
+  if (fat) items.push({ name: fat.name, grams: 100, role: "fat" });
+  if (produce) items.push({ name: produce.name, grams: 100, role: preferFruit ? "fruit" : "vegetable" });
 
   while (items.length < 4) {
     const extra = pickFromPool(pools.all, baseIndex + items.length, used, pools.all);
     if (!extra) break;
-    items.push({ name: extra.name, grams: 100 });
+    items.push({ name: extra.name, grams: 100, role: "extra" });
+  }
+
+  if (Number.isFinite(targetKcal)) {
+    const produceItem = items.find((item) => item.role === "fruit" || item.role === "vegetable");
+    const produceFood = produceItem ? getFoodByName(produceItem.name) : null;
+    const produceGrams = produceItem ? roundGrams(produceItem.grams || 100) : 0;
+    if (produceItem) produceItem.grams = produceGrams || 100;
+    const produceKcal = produceFood ? Math.round((produceFood.kcal * (produceItem?.grams || 0)) / 100) : 0;
+    const remainingKcal = Math.max(targetKcal - produceKcal, 0);
+    const macroTargets = {
+      carb: remainingKcal * macroPercents.carb,
+      protein: remainingKcal * macroPercents.prot,
+      fat: remainingKcal * macroPercents.fat
+    };
+
+    items.forEach((item) => {
+      if (item.role === "carb") {
+        item.grams = calculateGramsForFood(getFoodByName(item.name), macroTargets.carb);
+      }
+      if (item.role === "protein") {
+        item.grams = calculateGramsForFood(getFoodByName(item.name), macroTargets.protein);
+      }
+      if (item.role === "fat") {
+        item.grams = calculateGramsForFood(getFoodByName(item.name), macroTargets.fat, 10);
+      }
+      if (item.role === "extra") {
+        item.grams = roundGrams(item.grams) || 100;
+      }
+    });
+  } else {
+    items.forEach((item) => {
+      item.grams = roundGrams(item.grams) || 100;
+    });
   }
 
   return items;
@@ -331,6 +376,8 @@ function generatePlan(){
   const totalCarbGr = Math.round((tdee * carbPerc) / 4);
   const totalProtGr = Math.round((tdee * protPerc) / 4);
   const totalFatGr = Math.round((tdee * fatPerc) / 9);
+  const perMealKcal = tdee / mealCount;
+  const macroPercents = { carb: carbPerc, prot: protPerc, fat: fatPerc };
 
   const selectedNames = foods
     .map((food) => food.name)
@@ -361,10 +408,10 @@ function generatePlan(){
           title: label,
           type: "breakfast",
           choice: "sweet",
-          options: buildBreakfastOptions(planFoods, pools, i)
+          options: buildBreakfastOptions(planFoods, pools, i, perMealKcal, macroPercents)
         };
       }
-      const items = buildMealItems(pools, i, mealIndex, preferFruit);
+      const items = buildMealItems(pools, i, mealIndex, preferFruit, null, perMealKcal, macroPercents);
       return { title: label, items };
     });
 
