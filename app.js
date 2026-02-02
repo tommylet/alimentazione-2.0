@@ -189,19 +189,6 @@ function getPreferredFood(preferredList, fallbackIndex, pool) {
   return pool[fallbackIndex % pool.length];
 }
 
-function buildBreakfastOptions(planFoods, pools, dayIndex, targetKcal, macroPercents) {
-  const sweetChoices = ["Fiocchi d'avena", "Yogurt greco 0%", "Banana", "Fragole", "Mela Golden"];
-  const savoryChoices = ["Uova", "Pane integrale", "Avocado", "Fiocchi di latte", "Petto di pollo"];
-
-  const sweetSeed = getPreferredFood(sweetChoices, dayIndex, planFoods);
-  const savorySeed = getPreferredFood(savoryChoices, dayIndex, planFoods);
-
-  return {
-    sweet: buildMealItems(pools, dayIndex, 0, true, sweetSeed, targetKcal, macroPercents),
-    savory: buildMealItems(pools, dayIndex, 1, true, savorySeed, targetKcal, macroPercents)
-  };
-}
-
 const fruitNames = [
   "Albicocche",
   "Ananas",
@@ -354,6 +341,15 @@ function buildMealItems(pools, dayIndex, mealIndex, preferFruit, seedName, targe
         item.grams = roundGrams(item.grams) || 100;
       }
     });
+
+    const totalKcal = items.reduce((sum, item) => sum + calculateItemKcal(item), 0);
+    if (totalKcal > 0) {
+      const scale = targetKcal / totalKcal;
+      items.forEach((item) => {
+        const scaled = roundGrams(item.grams * scale);
+        item.grams = scaled || item.grams;
+      });
+    }
   } else {
     items.forEach((item) => {
       item.grams = roundGrams(item.grams) || 100;
@@ -403,14 +399,6 @@ function generatePlan(){
 
     const meals = labels.map((label, mealIndex) => {
       const preferFruit = label.includes("Colazione") || label.includes("Spuntino");
-      if (label === "Colazione") {
-        return {
-          title: label,
-          type: "breakfast",
-          choice: "sweet",
-          options: buildBreakfastOptions(planFoods, pools, i, perMealKcal, macroPercents)
-        };
-      }
       const items = buildMealItems(pools, i, mealIndex, preferFruit, null, perMealKcal, macroPercents);
       return { title: label, items };
     });
@@ -539,51 +527,6 @@ function renderPlan() {
       <p class="day-total" data-day-total="${dayIndex}"></p>`;
 
     day.meals.forEach((meal, mealIndex) => {
-      if (meal.type === "breakfast") {
-        html += `
-          <div class="pasto-card" data-day="${dayIndex}" data-meal="${mealIndex}">
-            <h3>${meal.title}</h3>
-            <div class="meal-choice">
-              <label><input type="radio" name="breakfast-${dayIndex}" value="sweet" ${
-                meal.choice === "sweet" ? "checked" : ""
-              }> Dolce</label>
-              <label><input type="radio" name="breakfast-${dayIndex}" value="savory" ${
-                meal.choice === "savory" ? "checked" : ""
-              }> Salata</label>
-            </div>
-            ${["sweet", "savory"]
-              .map((option) => {
-                const isActive = meal.choice === option;
-                const items = meal.options[option] ?? [];
-                return `
-                  <div class="meal-option ${isActive ? "active" : ""}" data-option="${option}">
-                    ${items
-                      .map(
-                        (item, itemIndex) => `
-                      <div class="meal-item">
-                        <select class="food-item-select" data-day="${dayIndex}" data-meal="${mealIndex}" data-item="${itemIndex}" data-option="${option}">
-                          ${foods
-                            .map(
-                              (food) =>
-                                `<option value="${food.name}" ${
-                                  food.name === item.name ? "selected" : ""
-                                }>${food.name}</option>`
-                            )
-                            .join("")}
-                        </select>
-                        <input class="food-item-grams" type="number" min="0" step="1" value="${item.grams}" data-day="${dayIndex}" data-meal="${mealIndex}" data-item="${itemIndex}" data-option="${option}">
-                        <span>g</span>
-                      </div>`
-                      )
-                      .join("")}
-                  </div>`;
-              })
-              .join("")}
-            <p class="meal-total" data-meal-total="${dayIndex}-${mealIndex}"></p>
-          </div>`;
-        return;
-      }
-
       html += `
         <div class="pasto-card" data-day="${dayIndex}" data-meal="${mealIndex}">
           <h3>${meal.title}</h3>
@@ -624,25 +567,21 @@ function renderPlan() {
 function bindPlanControls() {
   ui.planContainer.querySelectorAll(".food-item-select").forEach((select) => {
     select.addEventListener("change", (event) => {
-      const { day, meal, item, option } = event.target.dataset;
+      const { day, meal, item } = event.target.dataset;
       const dayIndex = Number(day);
       const mealIndex = Number(meal);
       const itemIndex = Number(item);
       const mealData = planData[dayIndex]?.meals[mealIndex];
       if (!mealData) return;
 
-      if (mealData.type === "breakfast" && option) {
-        mealData.options[option][itemIndex].name = event.target.value;
-      } else {
-        mealData.items[itemIndex].name = event.target.value;
-      }
+      mealData.items[itemIndex].name = event.target.value;
       updatePlanTotals();
     });
   });
 
   ui.planContainer.querySelectorAll(".food-item-grams").forEach((input) => {
     input.addEventListener("input", (event) => {
-      const { day, meal, item, option } = event.target.dataset;
+      const { day, meal, item } = event.target.dataset;
       const dayIndex = Number(day);
       const mealIndex = Number(meal);
       const itemIndex = Number(item);
@@ -650,40 +589,13 @@ function bindPlanControls() {
       if (!mealData) return;
 
       const gramsValue = Number(event.target.value) || 0;
-      if (mealData.type === "breakfast" && option) {
-        mealData.options[option][itemIndex].grams = gramsValue;
-      } else {
-        mealData.items[itemIndex].grams = gramsValue;
-      }
-      updatePlanTotals();
-    });
-  });
-
-  ui.planContainer.querySelectorAll("input[type='radio'][name^='breakfast-']").forEach((radio) => {
-    radio.addEventListener("change", (event) => {
-      const dayIndex = Number(event.target.name.replace("breakfast-", ""));
-      const choice = event.target.value;
-      const mealData = planData[dayIndex]?.meals.find((meal) => meal.type === "breakfast");
-      if (!mealData) return;
-
-      mealData.choice = choice;
-      const breakfastCard = ui.planContainer.querySelector(
-        `.pasto-card[data-day="${dayIndex}"][data-meal="${planData[dayIndex].meals.indexOf(mealData)}"]`
-      );
-      if (breakfastCard) {
-        breakfastCard.querySelectorAll(".meal-option").forEach((option) => {
-          option.classList.toggle("active", option.dataset.option === choice);
-        });
-      }
+      mealData.items[itemIndex].grams = gramsValue;
       updatePlanTotals();
     });
   });
 }
 
 function getMealItems(meal) {
-  if (meal.type === "breakfast") {
-    return meal.options?.[meal.choice] ?? [];
-  }
   return meal.items ?? [];
 }
 
@@ -860,24 +772,16 @@ function importData(file) {
       foods = Array.isArray(data.foods) ? data.foods : foods;
       selectedFoods = new Set(Array.isArray(data.selectedFoods) ? data.selectedFoods : foods.map((food) => food.name));
       planData = Array.isArray(data.planData) ? data.planData : planData;
-      planData = planData.map((day) => ({
-        ...day,
-        meals: (day.meals ?? []).map((meal) => {
-          if (meal.type === "breakfast") {
-            return {
-              ...meal,
-              options: {
-                sweet: (meal.options?.sweet ?? []).map(parseFoodItem),
-                savory: (meal.options?.savory ?? []).map(parseFoodItem)
-              }
-            };
-          }
-          return {
-            ...meal,
-            items: (meal.items ?? []).map(parseFoodItem)
-          };
-        })
-      }));
+  planData = planData.map((day) => ({
+    ...day,
+    meals: (day.meals ?? []).map((meal) => {
+      const items = meal.items ?? meal.options?.[meal.choice] ?? [];
+      return {
+        ...meal,
+        items: items.map((item) => parseFoodItem(item)).filter((item) => item && item.name)
+      };
+    })
+  }));
       renderFoods(foods);
       if (planData.length) {
         renderPlan();
@@ -909,8 +813,7 @@ function exportPdf() {
     day.meals.forEach((meal) => {
       const items = getMealItems(meal);
       const line = items.map((item) => `${item.name} ${item.grams}g`).join(", ");
-      const title = meal.type === "breakfast" ? `${meal.title} (${meal.choice === "sweet" ? "Dolce" : "Salata"})` : meal.title;
-      doc.text(`${title}: ${line}`, 16, y);
+      doc.text(`${meal.title}: ${line}`, 16, y);
       y += 5;
       if (y > 270) {
         doc.addPage();
