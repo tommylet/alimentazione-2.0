@@ -228,6 +228,11 @@ function filterByNames(list, names) {
   return list.filter((food) => normalized.includes(food.name.toLowerCase()));
 }
 
+function filterByExcludingNames(list, names) {
+  const normalized = names.map((name) => name.toLowerCase());
+  return list.filter((food) => !normalized.includes(food.name.toLowerCase()));
+}
+
 function isProduceFood(food) {
   const lowFat = food.fat <= 1.5;
   const lowProtein = food.prot <= 3;
@@ -256,6 +261,25 @@ function buildPools(planFoodsNames) {
   };
 }
 
+const breakfastCarbNames = ["Fiocchi d’avena", "Fiocchi d'avena", "Pane integrale", "Wasa fit", "Gallette di mais", "Riso Basmati"];
+const breakfastProteinNames = ["Yogurt greco 0 fat", "Fiocchi di latte", "Uovo", "Albume", "Budino proteico"];
+const breakfastFatNames = ["Mandorle", "Noci", "Noci pecan", "Anacardi", "Avocado"];
+
+const snackCarbNames = ["Gallette di mais", "Wasa fit", "Banana", "Mele Golden", "Kiwi", "Ananas", "Pesche"];
+const snackProteinNames = ["Yogurt greco 0 fat", "Fiocchi di latte", "Budino proteico", "Albume", "Tonno"];
+const snackFatNames = ["Mandorle", "Noci", "Noci pecan", "Anacardi", "Avocado"];
+
+const lunchDinnerProteinNames = ["Pollo", "Tonno", "Salmone", "Merluzzo", "Nasello", "Scamone", "Gamberi", "Gamberi sgusciati", "Ceci", "Lenticchie", "Piselli"];
+const lunchDinnerCarbNames = ["Riso Basmati", "Riso integrale", "Pasta integrale", "Farro perlato", "Patate", "CousCous", "Pane integrale"];
+const lunchDinnerFatNames = ["Olio evo", "Avocado", "Mandorle", "Noci", "Noci pecan"];
+
+function poolByNamesOrFallback(primaryPool, preferredNames, fallbackPool) {
+  const preferred = filterByNames(primaryPool, preferredNames);
+  if (preferred.length) return preferred;
+  const fallbackPreferred = filterByNames(fallbackPool, preferredNames);
+  return fallbackPreferred.length ? fallbackPreferred : fallbackPool;
+}
+
 function pickFromPool(pool, index, used, fallbackPool) {
   const list = pool.length ? pool : fallbackPool;
   if (!list.length) return null;
@@ -282,10 +306,38 @@ function calculateGramsForFood(food, targetKcal, minGrams = 30) {
   return Math.max(rounded, minGrams);
 }
 
-function buildMealItems(pools, dayIndex, mealIndex, preferFruit, seedName, targetKcal, macroPercents) {
+function buildMealItems(pools, dayIndex, mealIndex, mealLabel, seedName, targetKcal, macroPercents) {
   const used = new Set();
   const items = [];
   const baseIndex = dayIndex * 3 + mealIndex;
+  const isBreakfast = mealLabel.includes("Colazione");
+  const isSnack = mealLabel.includes("Spuntino") || mealLabel.includes("Pre-nanna");
+  const useFruit = isBreakfast || isSnack;
+
+  const carbPool = isBreakfast
+    ? poolByNamesOrFallback(pools.all, breakfastCarbNames, pools.carbs)
+    : isSnack
+      ? poolByNamesOrFallback(pools.all, snackCarbNames, pools.carbs)
+      : poolByNamesOrFallback(pools.all, lunchDinnerCarbNames, pools.carbs);
+
+  const proteinPool = isBreakfast
+    ? poolByNamesOrFallback(pools.all, breakfastProteinNames, pools.protein)
+    : isSnack
+      ? poolByNamesOrFallback(pools.all, snackProteinNames, pools.protein)
+      : poolByNamesOrFallback(pools.all, lunchDinnerProteinNames, pools.protein);
+
+  const fatPool = isBreakfast
+    ? poolByNamesOrFallback(pools.all, breakfastFatNames, pools.fats)
+    : isSnack
+      ? poolByNamesOrFallback(pools.all, snackFatNames, pools.fats)
+      : poolByNamesOrFallback(pools.all, lunchDinnerFatNames, pools.fats);
+
+  const produceBasePool = useFruit ? pools.fruits : pools.vegs;
+  const producePool = produceBasePool.length
+    ? produceBasePool
+    : useFruit
+      ? filterByExcludingNames(pools.produce, vegNames)
+      : filterByExcludingNames(pools.produce, fruitNames);
 
   const seed = seedName ? getFoodByName(seedName) : null;
   if (seed) {
@@ -293,17 +345,15 @@ function buildMealItems(pools, dayIndex, mealIndex, preferFruit, seedName, targe
     used.add(seed.name);
   }
 
-  const carb = pickFromPool(pools.carbs, baseIndex, used, pools.all);
-  const protein = pickFromPool(pools.protein, baseIndex + 1, used, pools.all);
-  const fat = pickFromPool(pools.fats, baseIndex + 2, used, pools.all);
-  const producePool = preferFruit ? pools.fruits : pools.vegs;
-  const produceFallback = producePool.length ? producePool : pools.produce;
-  const produce = pickFromPool(producePool, baseIndex + 3, used, produceFallback);
+  const carb = pickFromPool(carbPool, baseIndex, used, pools.carbs);
+  const protein = pickFromPool(proteinPool, baseIndex + 1, used, pools.protein);
+  const fat = pickFromPool(fatPool, baseIndex + 2, used, pools.fats);
+  const produce = pickFromPool(producePool, baseIndex + 3, used, pools.produce);
 
   if (carb) items.push({ name: carb.name, grams: 100, role: "carb" });
   if (protein) items.push({ name: protein.name, grams: 100, role: "protein" });
   if (fat) items.push({ name: fat.name, grams: 100, role: "fat" });
-  if (produce) items.push({ name: produce.name, grams: 100, role: preferFruit ? "fruit" : "vegetable" });
+  if (produce) items.push({ name: produce.name, grams: 100, role: useFruit ? "fruit" : "vegetable" });
 
   while (items.length < 4) {
     const extra = pickFromPool(pools.all, baseIndex + items.length, used, pools.all);
@@ -395,8 +445,7 @@ function generatePlan(){
     const labels = mealLabels[mealCount] ?? mealLabels[5];
 
     const meals = labels.map((label, mealIndex) => {
-      const preferFruit = label.includes("Colazione") || label.includes("Spuntino");
-      const items = buildMealItems(pools, i, mealIndex, preferFruit, null, perMealKcal, macroPercents);
+      const items = buildMealItems(pools, i, mealIndex, label, null, perMealKcal, macroPercents);
       return { title: label, items };
     });
 
