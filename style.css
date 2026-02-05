@@ -122,6 +122,43 @@ button {
         font-size: 15px;
     }
 
+.meal-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.meal-item select,
+.meal-item input {
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #cfd6e6;
+    background: #fff;
+}
+
+.meal-choice {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.meal-option {
+    display: none;
+    margin-bottom: 8px;
+}
+
+.meal-option.active {
+    display: block;
+}
+
+.meal-total,
+.day-total {
+    font-weight: 600;
+    color: #0b2545;
+    margin: 6px 0 0;
+}
+
 .footer {
     text-align: center;
     color: #777;
@@ -132,6 +169,28 @@ button {
 .info-text {
     font-style: italic;
     color: #666;
+}
+
+.foods-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+
+.foods-table th,
+.foods-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #eef1f6;
+    font-size: 14px;
+}
+
+.foods-table th {
+    background: #f1f5ff;
+    color: #0b2545;
 }
 
 /* ======================
