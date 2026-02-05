@@ -170,6 +170,19 @@ function calculateItemKcal(item) {
   return Math.round((food.kcal * item.grams) / 100);
 }
 
+function calculateItemMacros(item) {
+  const food = getFoodByName(item.name);
+  if (!food) {
+    return { carb: 0, prot: 0, fat: 0 };
+  }
+  const factor = item.grams / 100;
+  return {
+    carb: Math.round(food.carb * factor * 10) / 10,
+    prot: Math.round(food.prot * factor * 10) / 10,
+    fat: Math.round(food.fat * factor * 10) / 10
+  };
+}
+
 function parseFoodItem(raw) {
   if (typeof raw !== "string") return raw;
   const match = raw.match(/(.+?)\s(\d+(?:[.,]\d+)?)g$/i);
@@ -592,7 +605,8 @@ function renderPlan() {
               </select>
               <input class="food-item-grams" type="number" min="0" step="1" value="${item.grams}" data-day="${dayIndex}" data-meal="${mealIndex}" data-item="${itemIndex}">
               <span>g</span>
-            </div>`
+            </div>
+            <p class="item-macros" data-item-macros="${dayIndex}-${mealIndex}-${itemIndex}"></p>`
             )
             .join("")}
           <p class="meal-total" data-meal-total="${dayIndex}-${mealIndex}"></p>
@@ -652,6 +666,15 @@ function updatePlanTotals() {
       const items = getMealItems(meal);
       const mealTotal = items.reduce((sum, item) => sum + calculateItemKcal(item), 0);
       dayTotal += mealTotal;
+
+      items.forEach((item, itemIndex) => {
+        const macros = calculateItemMacros(item);
+        const itemMacrosNode = ui.planContainer.querySelector(`[data-item-macros="${dayIndex}-${mealIndex}-${itemIndex}"]`);
+        if (itemMacrosNode) {
+          itemMacrosNode.textContent = `C ${macros.carb}g · P ${macros.prot}g · F ${macros.fat}g · ${calculateItemKcal(item)} kcal`;
+        }
+      });
+
       const mealTotalNode = ui.planContainer.querySelector(`[data-meal-total="${dayIndex}-${mealIndex}"]`);
       if (mealTotalNode) {
         mealTotalNode.textContent = `Kcal pasto: ${mealTotal}`;
