@@ -319,6 +319,58 @@ function calculateGramsForFood(food, targetKcal, minGrams = 30) {
   return Math.max(rounded, minGrams);
 }
 
+
+
+function calculateDayNutrition(day) {
+  return day.meals.reduce(
+    (acc, meal) => {
+      (meal.items || []).forEach((item) => {
+        const macros = calculateItemMacros(item);
+        acc.carb += macros.carb;
+        acc.prot += macros.prot;
+        acc.fat += macros.fat;
+        acc.kcal += calculateItemKcal(item);
+      });
+      return acc;
+    },
+    { carb: 0, prot: 0, fat: 0, kcal: 0 }
+  );
+}
+
+function scaleRoleGrams(day, role, factor) {
+  day.meals.forEach((meal) => {
+    (meal.items || []).forEach((item) => {
+      if (item.role === role) {
+        item.grams = Math.max(5, roundGrams(item.grams * factor));
+      }
+    });
+  });
+}
+
+function scaleAllGrams(day, factor) {
+  day.meals.forEach((meal) => {
+    (meal.items || []).forEach((item) => {
+      item.grams = Math.max(5, roundGrams(item.grams * factor));
+    });
+  });
+}
+
+function optimizeDayToTargets(day, targets) {
+  for (let i = 0; i < 5; i++) {
+    const current = calculateDayNutrition(day);
+    if (current.carb > 0) scaleRoleGrams(day, "carb", targets.carb / current.carb);
+    if (current.prot > 0) scaleRoleGrams(day, "protein", targets.prot / current.prot);
+    if (current.fat > 0) scaleRoleGrams(day, "fat", targets.fat / current.fat);
+
+    const afterMacros = calculateDayNutrition(day);
+    if (afterMacros.kcal > 0) {
+      const kcalFactor = targets.kcal / afterMacros.kcal;
+      if (Math.abs(1 - kcalFactor) > 0.01) {
+        scaleAllGrams(day, kcalFactor);
+      }
+    }
+  }
+}
 function buildMealItems(pools, dayIndex, mealIndex, mealLabel, seedName, targetKcal, macroPercents) {
   const used = new Set();
   const items = [];
@@ -432,6 +484,7 @@ function generatePlan(){
   const totalCarbGr = Math.round((tdee * carbPerc) / 4);
   const totalProtGr = Math.round((tdee * protPerc) / 4);
   const totalFatGr = Math.round((tdee * fatPerc) / 9);
+  const dayTargets = { kcal: tdee, carb: totalCarbGr, prot: totalProtGr, fat: totalFatGr };
   const perMealKcal = tdee / mealCount;
   const macroPercents = { carb: carbPerc, prot: protPerc, fat: fatPerc };
 
@@ -462,11 +515,13 @@ function generatePlan(){
       return { title: label, items };
     });
 
-    planData.push({
+    const dayPlan = {
       day: giorno,
       macros: { carb: totalCarbGr, prot: totalProtGr, fat: totalFatGr },
       meals
-    });
+    };
+    optimizeDayToTargets(dayPlan, dayTargets);
+    planData.push(dayPlan);
   }
   renderPlan();
   setupDayTabs();
